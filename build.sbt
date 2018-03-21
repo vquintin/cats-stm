@@ -14,5 +14,6 @@ lazy val root = (project in file(".")).
     libraryDependencies += scalaTest % Test,
     libraryDependencies += cats,
     libraryDependencies += catsEffect,
+    libraryDependencies += catsMTL,
     libraryDependencies += scalaSTM,
   )

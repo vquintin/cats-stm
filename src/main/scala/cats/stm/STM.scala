@@ -1,8 +1,11 @@
 package cats.stm
 
-import cats.{Alternative, MonadError, ~>}
+import cats.{Alternative, Functor, MonadError, ~>}
 import cats.effect.IO
+import cats.mtl.FunctorEmpty
+import cats.mtl.syntax.empty._
 import cats.syntax.flatMap._
+import cats.syntax.functor._
 
 import scala.concurrent.stm._
 
@@ -59,8 +62,14 @@ object STM {
   def newTVar[A](a: A): STM[TVar[A]] =
     NewTVar(a)
 
+  def pure[A](a: A): STM[A] =
+    Pure(a)
+
   def retry: STM[Unit] =
     Retry
+
+  def check(cond: Boolean): STM[Unit] =
+    if (cond) pure(()) else retry
 
   val atomically: STM ~> IO =
     new ~>[STM, IO] {
@@ -70,21 +79,25 @@ object STM {
 
   private def unsafeRun[A](fa: STM[A])(implicit txn: scala.concurrent.stm.InTxn): A =
     fa match {
-      case Pure(a) => a
+      case Pure(a) =>
+        a
       case OrElse(l, r) =>
         atomic[A] { implicit txn =>
           unsafeRun(l)
         }.orAtomic[A] { implicit txn =>
           unsafeRun(r)
         }
-      case NewTVar(a) => TVar(Ref(a))
-      case ReadTVar(tVar) => tVar.ref()
+      case NewTVar(a) =>
+        new TVar(Ref(a))
+      case ReadTVar(tVar) =>
+        tVar.ref()
       case WriteTVar(tVar, a) =>
         tVar.ref() = a
-      case Retry => scala.concurrent.stm.retry
-      case RaiseError(e) => throw e
+      case Retry =>
+        scala.concurrent.stm.retry
+      case RaiseError(e) =>
+        throw e
       case Bind(fa, f) =>
-        val r = unsafeRun(fa)
-        unsafeRun(f(r))
+        unsafeRun(f(unsafeRun(fa)))
     }
 }

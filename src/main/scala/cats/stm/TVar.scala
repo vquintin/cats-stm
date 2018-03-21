@@ -1,9 +1,10 @@
 package cats.stm
 
 import cats.syntax.flatMap._
+import cats.syntax.functor._
 import scala.concurrent.stm.Ref
 
-final case class TVar[A] private[stm](private[stm] val ref: Ref[A]) {
+final class TVar[A] private[stm](private[stm] val ref: Ref[A]) {
   def get: STM[A] =
     ReadTVar(this)
 
@@ -12,4 +13,10 @@ final case class TVar[A] private[stm](private[stm] val ref: Ref[A]) {
 
   def modify(f: A => A): STM[Unit] =
     get.flatMap(a => set(f(a)))
+
+  def swap(a: A): STM[A] =
+    for {
+      oldA <- get
+      _ <- set(a)
+    } yield oldA
 }
